@@ -3,7 +3,7 @@
 > **Desarrollado por: Ricardo Sanhueza**
 > *Ingeniero Civil en Informática (Chile)*
 
-> El puente entre tu voz y tu IA local.
+> El puente entre tu voz y tu OpenClaw local.
 
 **ClawVoice Worker** es el componente backend del ecosistema ClawVoice. Su función es conectar la aplicación Android con tu instancia local de **OpenClaw** a través de **Supabase**, permitiendo una comunicación verbal fluida, privada y en tiempo real.
 
