@@ -1,0 +1,18 @@
+# =============================================
+# ClawVoice Worker - Docker Compose
+# =============================================
+# Uso: docker-compose up -d
+# =============================================
+
+services:
+  clawvoice-worker:
+    build: .
+    container_name: clawvoice-worker
+    env_file: .env
+    # En Linux/Mac usa host network
+    network_mode: host
+    # Reiniciar automáticamente si falla
+    restart: unless-stopped
+    # Volumen para logs (opcional)
+    volumes:
+      - ./logs:/app/logs

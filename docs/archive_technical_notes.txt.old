@@ -1,0 +1,171 @@
+cd c:\Archivos-otros-programas\claw2_worker
+python worker.py
+
+
+# Claw2 Realtime Worker
+
+## 1. ¿Qué es el Worker?
+
+El **Claw2 Realtime Worker** es un proceso backend escrito en Python que actúa como puente entre:
+
+* La aplicación Android (ClawVoice)
+* La base de datos en Supabase
+* El modelo local ejecutado en OpenClaw
+
+Su función principal es escuchar mensajes nuevos enviados por la app móvil, procesarlos con OpenClaw y guardar la respuesta en la base de datos para que el celular la reciba en tiempo real.
+
+---
+
+## 2. Arquitectura General
+
+Flujo completo del sistema:
+
+1. El usuario habla en la app Android.
+2. La app convierte voz a texto.
+3. Se inserta un registro en la tabla `oclaw2_messages` con:
+
+   * role = "user"
+   * status = "pending"
+4. El Worker detecta el INSERT en tiempo real (Supabase Realtime).
+5. El Worker llama a OpenClaw local usando `/v1/chat/completions`.
+6. El Worker inserta un nuevo registro con:
+
+   * role = "assistant"
+   * status = "completed"
+7. La app Android recibe el evento Realtime.
+8. El teléfono reproduce la respuesta por TTS.
+
+No existe polling. Todo ocurre mediante WebSockets y eventos en tiempo real.
+
+---
+
+## 3. Componentes del Worker
+
+### 3.1 Supabase Client
+
+Se utiliza el cliente oficial de Supabase para:
+
+* Actualizar el estado del mensaje (`pending` → `processing`)
+* Insertar la respuesta del asistente
+
+Se recomienda usar la **SERVICE_ROLE_KEY** para evitar problemas con RLS.
+
+---
+
+### 3.2 Supabase Realtime
+
+El Worker se suscribe a eventos tipo:
+
+```
+INSERT ON public.oclaw2_messages
+```
+
+Cuando se detecta un nuevo registro, se ejecuta una función que valida:
+
+```
+role == "user"
+status == "pending"
+```
+
+Solo en ese caso se procesa el mensaje.
+
+---
+
+### 3.3 OpenClaw (modelo local)
+
+El Worker realiza una petición HTTP POST a:
+
+```
+/v1/chat/completions
+```
+
+Enviando un payload compatible con la API tipo OpenAI:
+
+```
+{
+  "model": "qwen2.5-coder:7b",
+  "messages": [
+    {"role": "system", "content": "Eres un asistente útil."},
+    {"role": "user", "content": "mensaje del usuario"}
+  ]
+}
+```
+
+La respuesta se extrae desde:
+
+```
+data["choices"][0]["message"]["content"]
+```
+
+---
+
+## 4. Estados del Mensaje
+
+El sistema utiliza los siguientes estados:
+
+* `pending` → mensaje recién creado por Android
+* `processing` → el Worker está generando la respuesta
+* `completed` → respuesta lista para ser consumida
+
+Esto evita procesamiento duplicado y mejora trazabilidad.
+
+---
+
+## 5. Ventajas del Diseño
+
+✔ Arquitectura desacoplada
+✔ No requiere servidor externo
+✔ No utiliza polling
+✔ Respuesta en tiempo real
+✔ Fácil de replicar por otros desarrolladores
+✔ Modelo completamente local
+✔ Escalable (se puede contenerizar con Docker)
+
+---
+
+## 6. Variables de Entorno
+
+El Worker utiliza un archivo `.env` con:
+
+```
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENCLAW_URL=
+MODEL=
+OPENCLAW_TOKEN= (opcional)
+```
+
+Esto permite cambiar configuraciones sin modificar el código.
+
+---
+
+## 7. Requisitos Previos
+
+* Python 3.10+
+* Supabase con Realtime habilitado para la tabla
+* Tabla `oclaw2_messages` creada
+* OpenClaw ejecutándose localmente
+
+---
+
+## 8. Posibles Mejoras Futuras
+
+* Memoria conversacional (historial de mensajes)
+* Manejo multiusuario
+* Streaming de respuestas
+* Logs estructurados
+* Dockerización
+* Manejo avanzado de errores
+
+---
+
+## 9. Resumen Conceptual
+
+El Worker es el “cerebro operativo” del sistema.
+
+Android captura voz.
+Supabase almacena el mensaje.
+El Worker procesa con IA local.
+La respuesta vuelve automáticamente al usuario.
+
+Es un patrón moderno basado en eventos y tiempo real, ideal para asistentes de voz conectados a modelos locales.

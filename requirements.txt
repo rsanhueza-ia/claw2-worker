@@ -1,0 +1,10 @@
+supabase
+realtime
+requests
+python-dotenv
+websockets
+supabase
+realtime
+requests
+python-dotenv
+websockets
